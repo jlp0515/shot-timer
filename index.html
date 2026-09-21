@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Shot timer</title>
+<style>
+:root{
+  --bg:#EEF0EE; --panel:#FFFFFF; --ink:#16211C; --muted:#5C6B63; --line:#C9D0CB;
+  --blaze:#F2600C; --blaze-ink:#16211C; --ok:#2F7D4F;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121A16; --panel:#1A241F; --ink:#E8EEE9; --muted:#93A399; --line:#2A3630; --ok:#6FCB93;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121A16; --panel:#1A241F; --ink:#E8EEE9; --muted:#93A399; --line:#2A3630; --ok:#6FCB93;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:1.0625rem; line-height:1.4; transition:background .12s;
+  -webkit-tap-highlight-color:transparent;
+}
+body.flash{background:var(--blaze)}
+main{max-width:34rem; margin:0 auto; padding:0.75rem 1rem 3rem}
+header{display:flex; justify-content:space-between; align-items:baseline; padding:0.5rem 0}
+h1{font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:700; font-size:1.5rem; margin:0; letter-spacing:.01em}
+#chip{font-size:.9rem; color:var(--muted)}
+#chip.on{color:var(--ok); font-weight:600}
+
+.readout{text-align:center; padding:0.5rem 0 0.25rem}
+#big{
+  font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:700;
+  font-size:clamp(5.5rem,30vw,11rem); line-height:.95; font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em;
+}
+#status{min-height:1.5em; color:var(--muted); font-weight:500}
+#msg{margin:.5rem 0 0; padding:.6rem .75rem; border-left:4px solid var(--blaze); background:var(--panel); font-size:.95rem; text-align:left}
+#msg:empty{display:none}
+
+#go{
+  display:block; width:100%; min-height:5.75rem; margin:0.9rem 0 0.75rem;
+  border:0; border-radius:1rem; background:var(--blaze); color:var(--blaze-ink);
+  font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:700; font-size:2.4rem;
+  letter-spacing:.02em; cursor:pointer; touch-action:manipulation;
+}
+#go.stop{background:var(--ink); color:var(--bg)}
+#go:active{transform:scale(.985)}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--blaze); outline-offset:2px}
+
+.meterrow{display:flex; gap:.6rem; align-items:center}
+.meter{position:relative; flex:1; height:1.1rem; background:var(--panel); border:1px solid var(--line); border-radius:.3rem; overflow:hidden}
+#fill{position:absolute; inset:0 auto 0 0; width:0; background:var(--ok)}
+#fill.hit{background:var(--blaze)}
+#mark{position:absolute; top:-2px; bottom:-2px; width:3px; background:var(--ink)}
+.small{font-size:.9rem; color:var(--muted)}
+.btn{
+  min-height:2.75rem; padding:0 .9rem; border:1px solid var(--line); border-radius:.6rem;
+  background:var(--panel); color:var(--ink); font:inherit; font-weight:500; cursor:pointer; touch-action:manipulation;
+}
+
+#shots{list-style:none; margin:1rem 0 0; padding:0; border-top:1px solid var(--line)}
+#shots li{
+  display:grid; grid-template-columns:3rem 1fr 1fr; align-items:baseline;
+  padding:.45rem .25rem; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums;
+}
+#shots .n{color:var(--muted)}
+#shots .t{font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:600; font-size:1.7rem}
+#shots .s{text-align:right; color:var(--muted)}
+#shots .over .t{color:var(--blaze)}
+
+details{margin-top:1rem; background:var(--panel); border:1px solid var(--line); border-radius:.8rem}
+summary{padding:.85rem 1rem; font-weight:600; cursor:pointer; min-height:3rem}
+.body{padding:0 1rem 1rem}
+.field{display:grid; grid-template-columns:1fr auto; gap:.25rem .75rem; align-items:center; padding:.6rem 0; border-top:1px solid var(--line)}
+.field .hint{grid-column:1/-1; font-size:.88rem; color:var(--muted)}
+.field label{font-weight:500}
+select,input[type=number]{
+  min-height:2.75rem; min-width:6.5rem; padding:0 .6rem; font:inherit; color:var(--ink);
+  background:var(--bg); border:1px solid var(--line); border-radius:.5rem;
+}
+input[type=range]{grid-column:1/-1; width:100%; height:2.5rem; accent-color:var(--blaze)}
+.hrow{display:flex; justify-content:space-between; gap:.5rem; align-items:center; padding:.55rem 0; border-top:1px solid var(--line); font-variant-numeric:tabular-nums}
+.hrow .x{min-width:2.75rem}
+.hacts{display:flex; gap:.5rem; flex-wrap:wrap; padding-top:.75rem}
+textarea{width:100%; min-height:8rem; margin-top:.75rem; font:0.85rem ui-monospace,Menlo,monospace; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:.5rem}
+@media (prefers-reduced-motion:reduce){body{transition:none} #go:active{transform:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Shot timer</h1>
+    <span id="chip">Mic off</span>
+  </header>
+
+  <section class="readout" aria-live="polite">
+    <div id="big">0.00</div>
+    <div id="status">Ready</div>
+    <p id="msg"></p>
+  </section>
+
+  <button id="go" type="button">Start</button>
+
+  <div class="meterrow">
+    <div class="meter" aria-hidden="true"><div id="fill"></div><div id="mark"></div></div>
+    <button id="test" class="btn" type="button">Test mic</button>
+  </div>
+  <p class="small">A shot counts when the bar passes the line. Clap to check it.</p>
+
+  <ol id="shots"></ol>
+
+  <details id="setbox">
+    <summary>Settings</summary>
+    <div class="body">
+      <div class="field">
+        <label for="delay">Start delay</label>
+        <select id="delay">
+          <option value="random">Random 2 to 4 s</option>
+          <option value="fixed">Fixed 3 s</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="par">Par time, seconds</label>
+        <input id="par" type="number" inputmode="decimal" min="0" max="120" step="0.1">
+        <span class="hint">Second beep at this time. 0 turns it off.</span>
+      </div>
+      <div class="field">
+        <label for="max">Stop after this many shots</label>
+        <input id="max" type="number" inputmode="numeric" min="0" max="99" step="1">
+        <span class="hint">0 means it runs until you tap Stop.</span>
+      </div>
+      <div class="field">
+        <label for="level">Trigger level <span id="levelv" class="small"></span></label>
+        <input id="level" type="range" min="3" max="98" step="1">
+        <span class="hint">Lower for dry fire or a .22. Raise it if the next lane's shots get counted.</span>
+      </div>
+      <div class="field">
+        <label for="lock">Ignore echoes for <span id="lockv" class="small"></span></label>
+        <input id="lock" type="range" min="40" max="250" step="10">
+        <span class="hint">Splits shorter than this can't be measured. Raise it indoors if one shot counts twice.</span>
+      </div>
+    </div>
+  </details>
+
+  <details id="histbox">
+    <summary>Saved strings <span id="hcount" class="small"></span></summary>
+    <div class="body">
+      <div id="hist"></div>
+      <div class="hacts">
+        <button id="csv" class="btn" type="button">Copy all as CSV</button>
+        <button id="wipe" class="btn" type="button">Delete all</button>
+      </div>
+      <textarea id="csvout" hidden readonly></textarea>
+      <p class="small">Saved only in this browser on this phone. Nothing is sent anywhere.</p>
+    </div>
+  </details>
+</main>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var store={
+  get:function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+  set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+var S={delay:"random",par:0,max:0,level:50,lock:80};
+var saved=store.get("st.settings",null);
+if(saved&&typeof saved==="object"){for(var k in S){if(saved[k]!==undefined)S[k]=saved[k]}}
+var hist=store.get("st.history",[]); if(!Array.isArray(hist))hist=[];
+
+var ctx=null,stream=null,src=null,proc=null,sink=null;
+var samples=0,sr=48000,clockOff=Infinity,peak=0,shown=0;
+var state="idle",micless=false,run=null,drawn=-1,wake=null;
+
+var big=$("big"),statusEl=$("status"),go=$("go"),fill=$("fill"),mark=$("mark"),chip=$("chip");
+
+function fmt(t){return (Math.round(t*100)/100).toFixed(2)}
+function msg(t){$("msg").textContent=t||""}
+
+/* ---------- audio in ---------- */
+function onAudio(e){
+  var d=e.inputBuffer.getChannelData(0),n=d.length,r=run,i,v,t,open,p;
+  sr=e.inputBuffer.sampleRate;
+  var endT=(samples+n)/sr, off=ctx.currentTime-endT;
+  if(off<clockOff)clockOff=off;
+  if(r&&!micless&&state==="armed"){
+    var expT=r.beepCtx-clockOff;
+    if(endT>=expT-0.05){
+      r.expT=expT; r.t0=expT+(ctx.outputLatency||0);
+      r.beepThresh=Math.max(0.03,6*Math.sqrt(r.sumSq/Math.max(1,r.cnt)));
+      state="running";
+    }
+  }
+  for(i=0;i<n;i++){
+    v=d[i]; if(v<0)v=-v; if(v>peak)peak=v;
+    if(!r||micless)continue;
+    if(state==="armed"){r.sumSq+=v*v;r.cnt++;continue}
+    if(state!=="running")continue;
+    t=(samples+i)/sr;
+    if(!r.locked&&t>=r.expT-0.05&&t<=r.expT+0.4&&v>r.beepThresh){r.t0=t;r.locked=true}
+    if(r.locked&&t<r.t0+0.25){if(v>r.beepPeak)r.beepPeak=v;continue}
+    open=r.locked?r.t0+0.27:r.expT+0.45;
+    if(t<open||t<r.lockUntil||v<r.thr)continue;
+    if(r.par>0&&r.locked&&r.beepPeak>=r.thr*0.8){
+      p=r.t0+r.par; if(t>p-0.02&&t<p+0.27){r.masked=true;continue}
+    }
+    r.shots.push(t); r.lockUntil=t+r.lock;
+  }
+  samples+=n;
+}
+
+function micOn(){
+  if(proc)return Promise.resolve();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    var er=new Error("nomedia"); er.name="NoMediaDevices"; return Promise.reject(er);
+  }
+  return navigator.mediaDevices.getUserMedia({audio:{
+    echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1
+  }}).then(function(s){
+    stream=s; samples=0; clockOff=Infinity;
+    src=ctx.createMediaStreamSource(s);
+    proc=ctx.createScriptProcessor(512,1,1);
+    sink=ctx.createGain(); sink.gain.value=0;
+    proc.onaudioprocess=onAudio;
+    src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
+    chip.textContent="Mic on"; chip.className="on"; $("test").hidden=true;
+  });
+}
+function micOff(){
+  try{if(stream)stream.getTracks().forEach(function(t){t.stop()})}catch(e){}
+  try{if(proc){proc.onaudioprocess=null;proc.disconnect()} if(src)src.disconnect(); if(sink)sink.disconnect()}catch(e){}
+  stream=src=proc=sink=null;
+  chip.textContent="Mic off"; chip.className=""; $("test").hidden=false;
+}
+function micMsg(e){
+  var n=e&&e.name||"";
+  if(n==="NotAllowedError"||n==="SecurityError")return "The microphone is blocked for this page, so only the beeps will run. Allow the mic in your browser's site settings. If the page never asks, it has to be opened from its own https address.";
+  if(n==="NoMediaDevices")return "This page can't reach the microphone here, so only the beeps will run. It needs to be opened from an https address.";
+  if(n==="NotFoundError")return "No microphone found, so only the beeps will run.";
+  return "Couldn't open the microphone ("+(n||"unknown error")+"), so only the beeps will run.";
+}
+function ensureCtx(){
+  if(!ctx){var AC=window.AudioContext||window.webkitAudioContext; ctx=new AC({latencyHint:"interactive"})}
+  return ctx.resume();
+}
+
+/* ---------- audio out ---------- */
+function beep(at,dur,freq){
+  var o=ctx.createOscillator(),g=ctx.createGain();
+  o.type="square"; o.frequency.value=freq;
+  g.gain.setValueAtTime(0,at); g.gain.linearRampToValueAtTime(1,at+0.004);
+  g.gain.setValueAtTime(1,at+dur-0.01); g.gain.linearRampToValueAtTime(0,at+dur);
+  o.connect(g); g.connect(ctx.destination); o.start(at); o.stop(at+dur+0.02);
+  return o;
+}
+function flashAt(at){
+  return setTimeout(function(){
+    document.body.classList.add("flash");
+    setTimeout(function(){document.body.classList.remove("flash")},220);
+  },Math.max(0,(at-ctx.currentTime)*1000));
+}
+
+/* ---------- run control ---------- */
+function start(){
+  msg(""); go.disabled=true;
+  ensureCtx().then(function(){
+    micless=false;
+    return micOn().catch(function(e){micless=true;msg(micMsg(e))});
+  }).then(function(){
+    return ctx.state==="running"?null:ctx.resume();
+  }).then(function(){
+    var delay=S.delay==="random"?2+Math.random()*2:(S.delay==="fixed"?3:0.35);
+    var par=Number(S.par)||0;
+    clockOff=Infinity;
+    run={beepCtx:ctx.currentTime+delay,expT:0,t0:0,locked:false,beepPeak:0,beepThresh:1,
+         thr:S.level/100,lock:S.lock/1000,par:par,max:Number(S.max)||0,
+         shots:[],lockUntil:0,sumSq:0,cnt:0,masked:false,osc:[],timers:[]};
+    run.osc.push(beep(run.beepCtx,0.25,2600)); run.timers.push(flashAt(run.beepCtx));
+    if(par>0){run.osc.push(beep(run.beepCtx+par,0.25,2600)); run.timers.push(flashAt(run.beepCtx+par))}
+    state="armed"; drawn=-1; renderShots();
+    big.textContent="0.00"; statusEl.textContent="Stand by";
+    go.textContent="Stop"; go.className="stop"; go.disabled=false;
+    if(navigator.wakeLock){navigator.wakeLock.request("screen").then(function(w){wake=w}).catch(function(){})}
+  }).catch(function(e){
+    go.disabled=false; msg("This browser couldn't start the audio ("+(e&&e.name||"error")+").");
+  });
+}
+function stop(){
+  if(!run||state==="idle"||state==="done"){return}
+  var r=run,was=state; state="done";
+  r.osc.forEach(function(o){try{o.stop()}catch(e){}});
+  r.timers.forEach(clearTimeout); document.body.classList.remove("flash");
+  if(wake){try{wake.release()}catch(e){} wake=null}
+  go.textContent="Start"; go.className="";
+  if(was==="armed"){statusEl.textContent="Cancelled";return}
+  renderShots();
+  var rel=r.shots.map(function(t){return Math.round((t-r.t0)*1000)/1000});
+  if(rel.length){
+    var s=rel.length+(rel.length===1?" shot":" shots")+", first "+fmt(rel[0])+", total "+fmt(rel[rel.length-1]);
+    statusEl.textContent=s;
+    var notes=[];
+    if(!r.locked)notes.push("The mic didn't hear the start beep, so times may be slightly off. Turn the volume up.");
+    if(r.masked)notes.push("A sound during the par beep was ignored because the beep is louder than your trigger level.");
+    msg(notes.join(" "));
+    hist.unshift({at:new Date().toISOString(),shots:rel,par:r.par,synced:r.locked});
+    if(hist.length>300)hist.length=300;
+    store.set("st.history",hist); renderHist();
+  }else{
+    statusEl.textContent=micless?"Done":"No shots heard";
+  }
+}
+go.addEventListener("click",function(){(state==="armed"||state==="running")?stop():start()});
+$("test").addEventListener("click",function(){
+  msg(""); ensureCtx().then(micOn).catch(function(e){msg(micMsg(e))});
+});
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden){stop(); micOff()}
+});
+
+/* ---------- drawing ---------- */
+function renderShots(){
+  var ol=$("shots"); ol.textContent=""; if(!run)return;
+  var r=run; drawn=r.shots.length;
+  r.shots.forEach(function(t,i){
+    var rel=t-r.t0, split=i?t-r.shots[i-1]:rel;
+    var li=document.createElement("li");
+    if(r.par>0&&rel>r.par)li.className="over";
+    var a=document.createElement("span");a.className="n";a.textContent=i+1;
+    var b=document.createElement("span");b.className="t";b.textContent=fmt(rel);
+    var c=document.createElement("span");c.className="s";c.textContent=i?"+"+fmt(split):"first";
+    li.appendChild(a);li.appendChild(b);li.appendChild(c); ol.appendChild(li);
+  });
+}
+function frame(){
+  shown=Math.max(peak,shown*0.88); peak=0;
+  fill.style.width=Math.min(100,shown*100)+"%";
+  fill.className=shown>=S.level/100?"hit":"";
+  var r=run;
+  if(r&&ctx){
+    if(micless&&state==="armed"&&ctx.currentTime>=r.beepCtx){r.t0=r.beepCtx;state="running"}
+    if(state==="running"){
+      var now=micless?ctx.currentTime:samples/sr, el=Math.max(0,now-r.t0), n=r.shots.length;
+      if(n){
+        big.textContent=fmt(r.shots[n-1]-r.t0);
+        if(n!==drawn){renderShots(); statusEl.textContent="Shot "+n+(n>1?", split "+fmt(r.shots[n-1]-r.shots[n-2]):"")}
+      }else{
+        big.textContent=fmt(el); statusEl.textContent=micless?"Running":"Waiting for first shot";
+      }
+      if((r.max>0&&n>=r.max)||el>300||(micless&&r.par>0&&el>r.par+0.6))stop();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- history ---------- */
+function renderHist(){
+  var box=$("hist"); box.textContent="";
+  $("hcount").textContent=hist.length?"("+hist.length+")":"";
+  if(!hist.length){var p=document.createElement("p");p.className="small";p.textContent="Nothing saved yet. Every string with at least one shot lands here.";box.appendChild(p);return}
+  hist.forEach(function(h,i){
+    var row=document.createElement("div");row.className="hrow";
+    var d=new Date(h.at), txt=document.createElement("span");
+    txt.textContent=d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+
+      d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})+"  "+
+      h.shots.length+" shots, first "+fmt(h.shots[0])+", total "+fmt(h.shots[h.shots.length-1])+
+      (h.par?", par "+fmt(h.par):"");
+    var x=document.createElement("button");x.className="btn x";x.type="button";x.textContent="Delete";
+    x.setAttribute("aria-label","Delete this string");
+    x.addEventListener("click",function(){hist.splice(i,1);store.set("st.history",hist);renderHist()});
+    row.appendChild(txt);row.appendChild(x);box.appendChild(row);
+  });
+}
+$("csv").addEventListener("click",function(){
+  var lines=["string,date,par,shot,time,split"];
+  hist.slice().reverse().forEach(function(h,si){
+    h.shots.forEach(function(t,i){
+      lines.push([si+1,h.at,h.par||0,i+1,t.toFixed(3),(i?t-h.shots[i-1]:t).toFixed(3)].join(","));
+    });
+  });
+  var text=lines.join("\n"),out=$("csvout");
+  function show(){out.hidden=false;out.value=text;out.focus();out.select()}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){$("csv").textContent="Copied";setTimeout(function(){$("csv").textContent="Copy all as CSV"},1500)},show);
+  }else show();
+});
+$("wipe").addEventListener("click",function(){
+  if(hist.length&&confirm("Delete all saved strings?")){hist=[];store.set("st.history",hist);renderHist()}
+});
+
+/* ---------- settings ---------- */
+function paintSettings(){
+  $("levelv").textContent=S.level+"%"; $("lockv").textContent=(S.lock/1000).toFixed(2)+" s";
+  mark.style.left="calc("+S.level+"% - 1px)";
+}
+["delay","par","max","level","lock"].forEach(function(id){
+  var el=$(id); el.value=S[id];
+  el.addEventListener("input",function(){
+    S[id]=id==="delay"?el.value:Number(el.value)||0;
+    store.set("st.settings",S); paintSettings();
+  });
+});
+paintSettings(); renderHist(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
