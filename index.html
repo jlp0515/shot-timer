@@ -134,6 +134,10 @@ input[type=file]{font:inherit; max-width:100%}
     <button id="edit" class="btn" type="button">Edit</button>
   </div>
   <p id="ddesc"></p>
+  <div class="drillrow" id="whorow" hidden>
+    <label for="who" class="small" style="white-space:nowrap">Who's shooting</label>
+    <select id="who" aria-label="Who's shooting"></select>
+  </div>
 
   <section class="readout" aria-live="polite">
     <div id="big">0.00</div>
@@ -182,6 +186,11 @@ input[type=file]{font:inherit; max-width:100%}
     <summary>Settings</summary>
     <div class="body">
       <div class="field">
+        <label for="guests">Guest mode</label>
+        <input id="guests" type="checkbox" style="width:1.6rem;height:1.6rem;accent-color:var(--blaze)">
+        <span class="hint">Shows a "Who's shooting" picker. Guest runs are saved under their name and kept out of your scores. Off means every run is yours.</span>
+      </div>
+      <div class="field">
         <label for="delay">Start delay</label>
         <select id="delay">
           <option value="random">Random 2 to 4 s</option>
@@ -215,8 +224,13 @@ input[type=file]{font:inherit; max-width:100%}
   <details id="histbox">
     <summary>Scores <span id="hcount" class="small"></span></summary>
     <div class="body">
+      <div class="field" id="hwhorow" hidden>
+        <label for="hwho">Show scores for</label>
+        <select id="hwho"></select>
+      </div>
       <div id="hist"></div>
       <div class="hacts">
+        <button id="wipeguests" class="btn" type="button" hidden>Delete all guest runs</button>
         <button id="backup" class="btn" type="button">Save backup file</button>
         <label class="btn" for="restore" style="display:inline-flex;align-items:center">Restore from backup</label>
         <input id="restore" type="file" accept=".json,application/json" hidden>
@@ -237,11 +251,38 @@ var store={
   get:function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 };
-var S={delay:"random",par:0,max:0,level:50,lock:80,drill:"free"};
+var S={delay:"random",par:0,max:0,level:50,lock:80,drill:"free",guests:false,who:""};
 var saved=store.get("st.settings",null);
 if(saved&&typeof saved==="object"){for(var k in S){if(saved[k]!==undefined)S[k]=saved[k]}}
 var hist=store.get("st.history",[]); if(!Array.isArray(hist))hist=[];
 var custom=store.get("st.drills",[]); if(!Array.isArray(custom))custom=[];
+var guests=store.get("st.guests",[]); if(!Array.isArray(guests))guests=[];
+var histWho="";  /* "" = me, name = that guest, "*" = everyone */
+
+/* ---------- shooters ---------- */
+function shooterNow(){return S.guests?(S.who||""):""}
+function whoLabel(w){return w?w:"Me"}
+function paintWho(){
+  $("whorow").hidden=!S.guests;
+  var sel=$("who"); sel.textContent="";
+  [""].concat(guests).forEach(function(n){
+    var o=document.createElement("option"); o.value=n; o.textContent=whoLabel(n); sel.appendChild(o);
+  });
+  var add=document.createElement("option"); add.value="__add"; add.textContent="Add a name"; sel.appendChild(add);
+  if(S.who&&guests.indexOf(S.who)<0)S.who="";
+  sel.value=S.who;
+}
+$("who").addEventListener("change",function(){
+  if(this.value==="__add"){
+    var n=(prompt("Shooter's name")||"").trim().slice(0,30);
+    if(n&&n!=="Me"&&guests.indexOf(n)<0){guests.push(n);store.set("st.guests",guests)}
+    S.who=n&&n!=="Me"?n:S.who;
+  }else S.who=this.value;
+  store.set("st.settings",S); paintWho(); hideScore();
+});
+$("guests").addEventListener("change",function(){
+  S.guests=this.checked; store.set("st.settings",S); paintWho(); hideScore(); renderHist();
+});
 
 /* ---------- drills ---------- */
 var BUILTIN=[
@@ -433,13 +474,13 @@ function start(){
     var par=d.id==="free"?(Number(S.par)||0):(Number(d.par)||0);
     var max=d.id==="free"?(Number(S.max)||0):d.shots;
     clockOff=Infinity;
-    run={drill:d,beepCtx:ctx.currentTime+delay,expT:0,t0:0,locked:false,beepPeak:0,beepThresh:1,
+    run={drill:d,who:shooterNow(),beepCtx:ctx.currentTime+delay,expT:0,t0:0,locked:false,beepPeak:0,beepThresh:1,
          thr:S.level/100,lock:S.lock/1000,par:par,max:max,
          shots:[],lockUntil:0,sumSq:0,cnt:0,masked:false,osc:[],timers:[]};
     run.osc.push(beep(run.beepCtx,0.25,2600)); run.timers.push(flashAt(run.beepCtx));
     if(par>0){run.osc.push(beep(run.beepCtx+par,0.25,2600)); run.timers.push(flashAt(run.beepCtx+par))}
     state="armed"; drawn=-1; renderShots();
-    big.textContent="0.00"; statusEl.textContent="Stand by";
+    big.textContent="0.00"; statusEl.textContent="Stand by"+(run.who?", "+run.who:"");
     go.textContent="Stop"; go.className="stop"; go.disabled=false;
     if(navigator.wakeLock){navigator.wakeLock.request("screen").then(function(w){wake=w}).catch(function(){})}
   }).catch(function(e){
@@ -463,7 +504,7 @@ function stop(){
   if(!r.locked)notes.push("The mic didn't hear the start beep, so times may be slightly off. Turn the volume up.");
   if(r.masked)notes.push("A sound during the par beep was ignored because the beep is louder than your trigger level.");
   msg(notes.join(" "));
-  var entry={at:new Date().toISOString(),drill:r.drill.id,shots:rel,par:r.par,synced:r.locked,raw:raw,final:raw,hits:[],pen:0,clean:true};
+  var entry={at:new Date().toISOString(),drill:r.drill.id,who:r.who,shots:rel,par:r.par,synced:r.locked,raw:raw,final:raw,hits:[],pen:0,clean:true};
   if(r.drill.id==="free"){saveEntry(entry)}
   else{
     if(rel.length<r.drill.shots)notes.push("Heard "+rel.length+" of "+r.drill.shots+" shots.");
@@ -486,7 +527,7 @@ document.addEventListener("visibilitychange",function(){
 /* ---------- score card ---------- */
 function showScore(entry,d){
   pending={entry:entry,drill:d};
-  $("sctitle").textContent="Score: "+d.name;
+  $("sctitle").textContent="Score: "+d.name+(entry.who?" ("+entry.who+")":"");
   $("scraw").textContent="Raw time "+fmt(entry.raw)+" s. Enter your hits.";
   var z=$("zones"); z.textContent="";
   d.zones.forEach(function(zn,i){
@@ -520,7 +561,7 @@ function hideScore(){pending=null;$("score").hidden=true}
 $("scsave").addEventListener("click",function(){
   var s=calcScore(); if(!s)return;
   var e=pending.entry, nm=pending.drill.name; e.hits=s.hits; e.pen=s.pen; e.final=s.fin; e.clean=s.clean;
-  saveEntry(e); hideScore(); statusEl.textContent="Saved "+fmt(e.final)+" for "+nm;
+  saveEntry(e); hideScore(); statusEl.textContent="Saved "+fmt(e.final)+" for "+nm+(e.who?" ("+e.who+")":"");
 });
 $("scdrop").addEventListener("click",function(){hideScore();statusEl.textContent="Not saved"});
 
@@ -564,12 +605,33 @@ function dstamp(iso){
   var d=new Date(iso);
   return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
 }
+function paintHistWho(){
+  var names={}; hist.forEach(function(h){if(h.who)names[h.who]=1});
+  var list=Object.keys(names).sort();
+  $("hwhorow").hidden=!list.length&&!S.guests;
+  $("wipeguests").hidden=!list.length;
+  var sel=$("hwho"); sel.textContent="";
+  [""].concat(list,["*"]).forEach(function(n){
+    var o=document.createElement("option"); o.value=n; o.textContent=n==="*"?"Everyone":whoLabel(n); sel.appendChild(o);
+  });
+  if(histWho!=="*"&&histWho&&list.indexOf(histWho)<0)histWho="";
+  sel.value=histWho;
+}
+$("hwho").addEventListener("change",function(){histWho=this.value;renderHist()});
+$("wipeguests").addEventListener("click",function(){
+  var n=hist.filter(function(h){return h.who}).length;
+  if(n&&confirm("Delete all "+n+" guest runs? Your own runs are kept."))
+    {hist=hist.filter(function(h){return !h.who});store.set("st.history",hist);histWho="";renderHist()}
+});
 function renderHist(){
+  paintHistWho();
   var box=$("hist"); box.textContent="";
-  $("hcount").textContent=hist.length?"("+hist.length+")":"";
-  if(!hist.length){var p=document.createElement("p");p.className="small";p.textContent="Nothing saved yet. Scored drill runs and free-run strings land here.";box.appendChild(p);return}
+  var mine=hist.filter(function(h){return !h.who}).length;
+  $("hcount").textContent=hist.length?"("+(mine===hist.length?mine:mine+" mine, "+(hist.length-mine)+" guest")+")":"";
+  var shown=hist.filter(function(h){return histWho==="*"||(h.who||"")===histWho});
+  if(!shown.length){var p=document.createElement("p");p.className="small";p.textContent=hist.length?"No runs for "+whoLabel(histWho)+" yet.":"Nothing saved yet. Scored drill runs and free-run strings land here.";box.appendChild(p);return}
   var groups={},order=[];
-  hist.forEach(function(h){var id=h.drill||"free";if(!groups[id]){groups[id]=[];order.push(id)}groups[id].push(h)});
+  shown.forEach(function(h){var id=h.drill||"free";if(!groups[id]){groups[id]=[];order.push(id)}groups[id].push(h)});
   order.sort(function(a,b){return a==="free"?1:b==="free"?-1:drillName(a).localeCompare(drillName(b))});
   order.forEach(function(id){
     var rows=groups[id], g=document.createElement("div"); g.className="dgroup";
@@ -583,7 +645,7 @@ function renderHist(){
       var row=document.createElement("div"); row.className="hrow";
       var fin=h.final!=null?h.final:h.shots[h.shots.length-1];
       var txt=document.createElement("span");
-      var parts=[dstamp(h.at)];
+      var parts=[dstamp(h.at)+(histWho==="*"?" "+whoLabel(h.who):"")];
       if(id==="free")parts.push(h.shots.length+" shots, first "+fmt(h.shots[0])+", total "+fmt(fin)+(h.par?", par "+fmt(h.par):""));
       else{
         var s=fmt(fin);
@@ -603,11 +665,11 @@ function renderHist(){
   });
 }
 $("csv").addEventListener("click",function(){
-  var lines=["run,date,drill,raw,penalty,final,clean,hits,shot,time,split"];
+  var lines=["run,date,shooter,drill,raw,penalty,final,clean,hits,shot,time,split"];
   hist.slice().reverse().forEach(function(h,si){
     var fin=h.final!=null?h.final:h.shots[h.shots.length-1], raw=h.raw!=null?h.raw:fin;
     h.shots.forEach(function(t,i){
-      lines.push([si+1,h.at,'"'+drillName(h.drill||"free").replace(/"/g,'""')+'"',raw.toFixed(3),(h.pen||0).toFixed(2),fin.toFixed(3),
+      lines.push([si+1,h.at,'"'+whoLabel(h.who).replace(/"/g,'""')+'"','"'+drillName(h.drill||"free").replace(/"/g,'""')+'"',raw.toFixed(3),(h.pen||0).toFixed(2),fin.toFixed(3),
                   h.clean===false?"no":"yes",(h.hits||[]).join("+"),i+1,t.toFixed(3),(i?t-h.shots[i-1]:t).toFixed(3)].join(","));
     });
   });
@@ -624,7 +686,7 @@ $("wipe").addEventListener("click",function(){
 
 /* ---------- backup / restore ---------- */
 $("backup").addEventListener("click",function(){
-  var data={app:"shot-timer",version:1,exported:new Date().toISOString(),history:hist,drills:custom,settings:S};
+  var data={app:"shot-timer",version:2,exported:new Date().toISOString(),history:hist,drills:custom,guests:guests,settings:S};
   var text=JSON.stringify(data,null,1);
   var name="shot-timer-backup-"+data.exported.slice(0,10)+".json";
   try{
@@ -649,8 +711,10 @@ $("restore").addEventListener("change",function(){
     hist.sort(function(a,b){return a.at<b.at?1:-1});
     var haveD={}; custom.forEach(function(d){haveD[d.id]=1});
     (data.drills||[]).forEach(function(d){if(d&&d.id&&!haveD[d.id]&&d.name){custom.push(d);addedD++}});
-    store.set("st.history",hist); store.set("st.drills",custom);
-    paintDrills(); renderHist();
+    (data.guests||[]).forEach(function(n){if(typeof n==="string"&&n&&guests.indexOf(n)<0)guests.push(n)});
+    hist.forEach(function(h){if(h.who&&guests.indexOf(h.who)<0)guests.push(h.who)});
+    store.set("st.history",hist); store.set("st.drills",custom); store.set("st.guests",guests);
+    paintDrills(); paintWho(); renderHist();
     statusEl.textContent="Restored "+added+" runs and "+addedD+" drills"; msg("");
   };
   rd.readAsText(f); this.value="";
@@ -668,7 +732,8 @@ function paintSettings(){
     store.set("st.settings",S); paintSettings();
   });
 });
-paintSettings(); paintDrills(); renderHist(); requestAnimationFrame(frame);
+$("guests").checked=!!S.guests;
+paintSettings(); paintDrills(); paintWho(); renderHist(); requestAnimationFrame(frame);
 })();
 </script>
 </body>
