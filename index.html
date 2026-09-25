@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Shot timer</title>
 <style>
 :root{
@@ -31,15 +32,19 @@ body{
 body.flash{background:var(--blaze)}
 main{max-width:34rem; margin:0 auto; padding:0.75rem 1rem 3rem}
 header{display:flex; justify-content:space-between; align-items:baseline; padding:0.5rem 0}
-h1{font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:700; font-size:1.5rem; margin:0; letter-spacing:.01em}
+h1,.cond{font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:700}
+h1{font-size:1.5rem; margin:0; letter-spacing:.01em}
 #chip{font-size:.9rem; color:var(--muted)}
 #chip.on{color:var(--ok); font-weight:600}
 
-.readout{text-align:center; padding:0.5rem 0 0.25rem}
+.drillrow{display:flex; gap:.5rem; align-items:center; padding:.25rem 0 0}
+.drillrow select{flex:1; min-width:0}
+#ddesc{margin:.35rem 0 0; font-size:.92rem; color:var(--muted); min-height:1.3em}
+
+.readout{text-align:center; padding:0.25rem 0 0.25rem}
 #big{
   font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:700;
-  font-size:clamp(5.5rem,30vw,11rem); line-height:.95; font-variant-numeric:tabular-nums;
-  letter-spacing:-.01em;
+  font-size:clamp(5.5rem,30vw,11rem); line-height:.95; font-variant-numeric:tabular-nums; letter-spacing:-.01em;
 }
 #status{min-height:1.5em; color:var(--muted); font-weight:500}
 #msg{margin:.5rem 0 0; padding:.6rem .75rem; border-left:4px solid var(--blaze); background:var(--panel); font-size:.95rem; text-align:left}
@@ -53,7 +58,7 @@ h1{font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-se
 }
 #go.stop{background:var(--ink); color:var(--bg)}
 #go:active{transform:scale(.985)}
-button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--blaze); outline-offset:2px}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,textarea:focus-visible{outline:3px solid var(--blaze); outline-offset:2px}
 
 .meterrow{display:flex; gap:.6rem; align-items:center}
 .meter{position:relative; flex:1; height:1.1rem; background:var(--panel); border:1px solid var(--line); border-radius:.3rem; overflow:hidden}
@@ -65,6 +70,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
   min-height:2.75rem; padding:0 .9rem; border:1px solid var(--line); border-radius:.6rem;
   background:var(--panel); color:var(--ink); font:inherit; font-weight:500; cursor:pointer; touch-action:manipulation;
 }
+.btn.primary{background:var(--ink); color:var(--bg); border-color:var(--ink)}
 
 #shots{list-style:none; margin:1rem 0 0; padding:0; border-top:1px solid var(--line)}
 #shots li{
@@ -75,6 +81,18 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 #shots .t{font-family:"Avenir Next Condensed","Roboto Condensed","Arial Narrow",sans-serif; font-weight:600; font-size:1.7rem}
 #shots .s{text-align:right; color:var(--muted)}
 #shots .over .t{color:var(--blaze)}
+#shots:empty{border:0}
+
+/* score card */
+#score{margin-top:1rem; padding:1rem; background:var(--panel); border:2px solid var(--blaze); border-radius:.8rem}
+#score[hidden]{display:none}
+#score h2{margin:0 0 .25rem; font-size:1.2rem}
+#score .zone{display:grid; grid-template-columns:1fr auto; gap:.5rem; align-items:center; padding:.5rem 0; border-top:1px solid var(--line)}
+#score .zone input{width:5.5rem}
+#score .final{display:flex; justify-content:space-between; align-items:baseline; padding:.75rem 0 .25rem; border-top:1px solid var(--line); margin-top:.25rem}
+#score .final .cond{font-size:2.2rem; font-variant-numeric:tabular-nums}
+#score .acts{display:flex; gap:.5rem; margin-top:.75rem}
+#score .acts .btn{flex:1}
 
 details{margin-top:1rem; background:var(--panel); border:1px solid var(--line); border-radius:.8rem}
 summary{padding:.85rem 1rem; font-weight:600; cursor:pointer; min-height:3rem}
@@ -82,15 +100,25 @@ summary{padding:.85rem 1rem; font-weight:600; cursor:pointer; min-height:3rem}
 .field{display:grid; grid-template-columns:1fr auto; gap:.25rem .75rem; align-items:center; padding:.6rem 0; border-top:1px solid var(--line)}
 .field .hint{grid-column:1/-1; font-size:.88rem; color:var(--muted)}
 .field label{font-weight:500}
-select,input[type=number]{
+.field.wide{grid-template-columns:1fr}
+select,input[type=number],input[type=text],textarea{
   min-height:2.75rem; min-width:6.5rem; padding:0 .6rem; font:inherit; color:var(--ink);
   background:var(--bg); border:1px solid var(--line); border-radius:.5rem;
 }
+input[type=text],textarea{width:100%}
+textarea{padding:.5rem .6rem; min-height:4rem}
 input[type=range]{grid-column:1/-1; width:100%; height:2.5rem; accent-color:var(--blaze)}
-.hrow{display:flex; justify-content:space-between; gap:.5rem; align-items:center; padding:.55rem 0; border-top:1px solid var(--line); font-variant-numeric:tabular-nums}
-.hrow .x{min-width:2.75rem}
+input[type=file]{font:inherit; max-width:100%}
+
+/* scores */
+.dgroup{border-top:1px solid var(--line); padding:.6rem 0}
+.dgroup h3{margin:0; font-size:1.05rem; display:flex; justify-content:space-between; gap:.5rem; flex-wrap:wrap}
+.dgroup .stats{color:var(--muted); font-size:.9rem; font-weight:400; font-variant-numeric:tabular-nums}
+.hrow{display:flex; justify-content:space-between; gap:.5rem; align-items:center; padding:.4rem 0; font-variant-numeric:tabular-nums; font-size:.97rem}
+.hrow .x{min-width:2.75rem; min-height:2.25rem}
+.hrow .best{color:var(--ok); font-weight:600}
 .hacts{display:flex; gap:.5rem; flex-wrap:wrap; padding-top:.75rem}
-textarea{width:100%; min-height:8rem; margin-top:.75rem; font:0.85rem ui-monospace,Menlo,monospace; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:.5rem}
+#csvout{width:100%; min-height:8rem; margin-top:.75rem; font:0.85rem ui-monospace,Menlo,monospace}
 @media (prefers-reduced-motion:reduce){body{transition:none} #go:active{transform:none}}
 </style>
 </head>
@@ -100,6 +128,12 @@ textarea{width:100%; min-height:8rem; margin-top:.75rem; font:0.85rem ui-monospa
     <h1>Shot timer</h1>
     <span id="chip">Mic off</span>
   </header>
+
+  <div class="drillrow">
+    <select id="drill" aria-label="Drill"></select>
+    <button id="edit" class="btn" type="button">Edit</button>
+  </div>
+  <p id="ddesc"></p>
 
   <section class="readout" aria-live="polite">
     <div id="big">0.00</div>
@@ -117,6 +151,33 @@ textarea{width:100%; min-height:8rem; margin-top:.75rem; font:0.85rem ui-monospa
 
   <ol id="shots"></ol>
 
+  <section id="score" hidden>
+    <h2 id="sctitle">Score this run</h2>
+    <p class="small" id="scraw"></p>
+    <div id="zones"></div>
+    <div class="final"><span id="scgrade" class="small"></span><span id="scfinal" class="cond">0.00</span></div>
+    <div class="acts">
+      <button id="scsave" class="btn primary" type="button">Save score</button>
+      <button id="scdrop" class="btn" type="button">Discard</button>
+    </div>
+  </section>
+
+  <details id="editbox">
+    <summary>Custom drill</summary>
+    <div class="body">
+      <div class="field wide"><label for="cname">Name</label><input id="cname" type="text" maxlength="40" placeholder="2-2-2"></div>
+      <div class="field"><label for="cshots">Shots</label><input id="cshots" type="number" inputmode="numeric" min="1" max="99" step="1" value="6"></div>
+      <div class="field"><label for="cpar">Par time, seconds</label><input id="cpar" type="number" inputmode="decimal" min="0" max="120" step="0.1" value="0"><span class="hint">0 for none.</span></div>
+      <div class="field"><label for="cpen">Seconds added per miss</label><input id="cpen" type="number" inputmode="decimal" min="0" max="30" step="0.5" value="0"><span class="hint">0 means a miss just marks the run as not clean.</span></div>
+      <div class="field wide"><label for="cdesc">Course of fire</label><textarea id="cdesc" maxlength="300" placeholder="Distance, target, start position, what each shot goes to."></textarea></div>
+      <div class="hacts">
+        <button id="csave" class="btn primary" type="button">Save drill</button>
+        <button id="cdel" class="btn" type="button" hidden>Delete drill</button>
+      </div>
+      <p class="small">Built-in drills can't be changed. Pick a custom one from the list to edit it.</p>
+    </div>
+  </details>
+
   <details id="setbox">
     <summary>Settings</summary>
     <div class="body">
@@ -131,12 +192,12 @@ textarea{width:100%; min-height:8rem; margin-top:.75rem; font:0.85rem ui-monospa
       <div class="field">
         <label for="par">Par time, seconds</label>
         <input id="par" type="number" inputmode="decimal" min="0" max="120" step="0.1">
-        <span class="hint">Second beep at this time. 0 turns it off.</span>
+        <span class="hint">Free run only. Second beep at this time; 0 turns it off.</span>
       </div>
       <div class="field">
         <label for="max">Stop after this many shots</label>
         <input id="max" type="number" inputmode="numeric" min="0" max="99" step="1">
-        <span class="hint">0 means it runs until you tap Stop.</span>
+        <span class="hint">Free run only. 0 means it runs until you tap Stop.</span>
       </div>
       <div class="field">
         <label for="level">Trigger level <span id="levelv" class="small"></span></label>
@@ -152,15 +213,18 @@ textarea{width:100%; min-height:8rem; margin-top:.75rem; font:0.85rem ui-monospa
   </details>
 
   <details id="histbox">
-    <summary>Saved strings <span id="hcount" class="small"></span></summary>
+    <summary>Scores <span id="hcount" class="small"></span></summary>
     <div class="body">
       <div id="hist"></div>
       <div class="hacts">
+        <button id="backup" class="btn" type="button">Save backup file</button>
+        <label class="btn" for="restore" style="display:inline-flex;align-items:center">Restore from backup</label>
+        <input id="restore" type="file" accept=".json,application/json" hidden>
         <button id="csv" class="btn" type="button">Copy all as CSV</button>
         <button id="wipe" class="btn" type="button">Delete all</button>
       </div>
       <textarea id="csvout" hidden readonly></textarea>
-      <p class="small">Saved only in this browser on this phone. Nothing is sent anywhere.</p>
+      <p class="small">Saved only in this browser on this phone. Nothing is sent anywhere. The backup file holds your scores and custom drills; restoring adds anything missing.</p>
     </div>
   </details>
 </main>
@@ -173,14 +237,99 @@ var store={
   get:function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 };
-var S={delay:"random",par:0,max:0,level:50,lock:80};
+var S={delay:"random",par:0,max:0,level:50,lock:80,drill:"free"};
 var saved=store.get("st.settings",null);
 if(saved&&typeof saved==="object"){for(var k in S){if(saved[k]!==undefined)S[k]=saved[k]}}
 var hist=store.get("st.history",[]); if(!Array.isArray(hist))hist=[];
+var custom=store.get("st.drills",[]); if(!Array.isArray(custom))custom=[];
 
+/* ---------- drills ---------- */
+var BUILTIN=[
+  {id:"free",name:"Free run",shots:0,par:0,zones:[],desc:"Par and shot count come from Settings. Every string is saved."},
+  {id:"bill",name:"Bill Drill",shots:6,par:0,clean:true,
+   desc:"7 yards, from the holster. 6 rounds to the A-zone of one target. Counts as clean only if all 6 hit.",
+   zones:[{n:"A-zone hits",shots:6,pen:0}]},
+  {id:"moz",name:"Mozambique",shots:3,par:0,clean:true,
+   desc:"7 yards, from the holster. 2 to the body, then 1 to the head.",
+   zones:[{n:"Body hits",shots:2,pen:0},{n:"Head hits",shots:1,pen:0}]},
+  {id:"fast",name:"FAST",shots:6,par:0,
+   desc:"7 yards, from concealment. 2 to the 3x5 head box, slide-lock reload, 4 to the 8 in. body circle. Each head miss adds 2 s, each body miss adds 1 s.",
+   zones:[{n:"Head box hits",shots:2,pen:2},{n:"Body circle hits",shots:4,pen:1}],
+   grades:[[5,"Expert, under 5 s"],[7,"Advanced, 5 to 7 s"],[10,"Intermediate, 7 to 10 s"],[1e9,"Novice, over 10 s"]]},
+  {id:"222",name:"2-2-2",shots:6,par:0,clean:true,
+   desc:"3 targets, 7 yards, from the holster. 2 shots on each target, left to right. Work the transitions; the splits list shows where the time goes.",
+   zones:[{n:"Target 1 hits",shots:2,pen:0},{n:"Target 2 hits",shots:2,pen:0},{n:"Target 3 hits",shots:2,pen:0}]},
+  {id:"elpres",name:"El Presidente",shots:12,par:10,clean:true,
+   desc:"3 targets 1 yard apart, 10 yards, start facing away with hands up. Turn, draw, 2 on each target, reload, 2 on each again. Classic par is 10 s; under 6 s clean is very good.",
+   zones:[{n:"A-zone hits",shots:12,pen:0}]},
+  {id:"5x5",name:"5x5 (one string)",shots:5,par:5,clean:true,
+   desc:"5 yards, 5 shots into a 5 in. circle, par 5 s, from the holster. Bill Wilson's full drill is 4 of these strings back to back: freestyle, strong hand only, freestyle from slide lock with reload, and 2 targets. Run it 4 times.",
+   zones:[{n:"Hits in the circle",shots:5,pen:0}]},
+  {id:"draw",name:"Draw to first shot",shots:1,par:0,clean:true,
+   desc:"7 yards, from the holster or concealment, 1 shot to the A-zone or an index card. Pure draw-stroke practice; track the first-shot time.",
+   zones:[{n:"Hit",shots:1,pen:0}]},
+  {id:"1r1",name:"1-Reload-1",shots:2,par:0,clean:true,
+   desc:"7 yards, from the ready with 1 round in the gun. 1 shot, slide-lock reload, 1 shot. The split between shots is your reload time.",
+   zones:[{n:"Hits",shots:2,pen:0}]},
+  {id:"dot",name:"Dot drill, one string",shots:5,par:0,clean:true,
+   desc:"3 yards, 2 in. dot, 5 slow shots from the ready. Accuracy first, then push speed while keeping all 5 on the dot. Dry fire works well here with a low trigger level.",
+   zones:[{n:"Hits on the dot",shots:5,pen:0}]}
+];
+function allDrills(){return BUILTIN.concat(custom)}
+function findDrill(id){var a=allDrills();for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i];return BUILTIN[0]}
+function curDrill(){return findDrill(S.drill)}
+function drillName(id){var d=findDrill(id);return id&&d.id===id?d.name:"Free run"}
+
+function paintDrills(){
+  var sel=$("drill"); sel.textContent="";
+  allDrills().forEach(function(d){
+    var o=document.createElement("option"); o.value=d.id; o.textContent=d.name; sel.appendChild(o);
+  });
+  if(!findDrill(S.drill)||findDrill(S.drill).id!==S.drill)S.drill="free";
+  sel.value=S.drill; paintDrillInfo();
+}
+function paintDrillInfo(){
+  var d=curDrill(), bits=[];
+  if(d.id!=="free"){bits.push(d.shots+" shots"); if(d.par>0)bits.push("par "+fmt(d.par))}
+  $("ddesc").textContent=(bits.length?bits.join(", ")+". ":"")+(d.desc||"");
+  var isCustom=custom.indexOf(d)>=0;
+  $("edit").textContent=isCustom?"Edit":"New";
+  $("cdel").hidden=!isCustom;
+  if(isCustom){
+    $("cname").value=d.name; $("cshots").value=d.shots; $("cpar").value=d.par||0;
+    $("cpen").value=d.zones[0]?d.zones[0].pen:0; $("cdesc").value=d.desc||"";
+  }
+}
+$("drill").addEventListener("change",function(){
+  S.drill=this.value; store.set("st.settings",S); paintDrillInfo(); hideScore();
+});
+$("edit").addEventListener("click",function(){
+  var d=curDrill();
+  if(custom.indexOf(d)<0){$("cname").value="";$("cshots").value=6;$("cpar").value=0;$("cpen").value=0;$("cdesc").value="";$("cdel").hidden=true}
+  $("editbox").open=true; $("cname").focus();
+});
+$("csave").addEventListener("click",function(){
+  var name=$("cname").value.trim(), shots=Math.max(1,Math.min(99,Math.round(Number($("cshots").value)||0)));
+  if(!name){msg("Give the drill a name before saving.");$("cname").focus();return}
+  var d=curDrill(), editing=custom.indexOf(d)>=0;
+  var nd={id:editing?d.id:"c"+Date.now().toString(36),name:name,shots:shots,par:Math.max(0,Number($("cpar").value)||0),
+          desc:$("cdesc").value.trim(),clean:true,
+          zones:[{n:"Hits",shots:shots,pen:Math.max(0,Number($("cpen").value)||0)}]};
+  if(editing)custom[custom.indexOf(d)]=nd; else custom.push(nd);
+  store.set("st.drills",custom); S.drill=nd.id; store.set("st.settings",S);
+  paintDrills(); $("editbox").open=false; msg(""); statusEl.textContent="Saved "+nd.name;
+});
+$("cdel").addEventListener("click",function(){
+  var d=curDrill(), i=custom.indexOf(d); if(i<0)return;
+  if(!confirm("Delete the drill \""+d.name+"\"? Saved scores for it are kept."))return;
+  custom.splice(i,1); store.set("st.drills",custom); S.drill="free"; store.set("st.settings",S);
+  paintDrills(); $("editbox").open=false; renderHist();
+});
+
+/* ---------- audio state ---------- */
 var ctx=null,stream=null,src=null,proc=null,sink=null;
 var samples=0,sr=48000,clockOff=Infinity,peak=0,shown=0;
-var state="idle",micless=false,run=null,drawn=-1,wake=null;
+var state="idle",micless=false,run=null,drawn=-1,wake=null,pending=null;
 
 var big=$("big"),statusEl=$("status"),go=$("go"),fill=$("fill"),mark=$("mark"),chip=$("chip");
 
@@ -272,7 +421,8 @@ function flashAt(at){
 
 /* ---------- run control ---------- */
 function start(){
-  msg(""); go.disabled=true;
+  msg(""); hideScore(); go.disabled=true;
+  var d=curDrill();
   ensureCtx().then(function(){
     micless=false;
     return micOn().catch(function(e){micless=true;msg(micMsg(e))});
@@ -280,10 +430,11 @@ function start(){
     return ctx.state==="running"?null:ctx.resume();
   }).then(function(){
     var delay=S.delay==="random"?2+Math.random()*2:(S.delay==="fixed"?3:0.35);
-    var par=Number(S.par)||0;
+    var par=d.id==="free"?(Number(S.par)||0):(Number(d.par)||0);
+    var max=d.id==="free"?(Number(S.max)||0):d.shots;
     clockOff=Infinity;
-    run={beepCtx:ctx.currentTime+delay,expT:0,t0:0,locked:false,beepPeak:0,beepThresh:1,
-         thr:S.level/100,lock:S.lock/1000,par:par,max:Number(S.max)||0,
+    run={drill:d,beepCtx:ctx.currentTime+delay,expT:0,t0:0,locked:false,beepPeak:0,beepThresh:1,
+         thr:S.level/100,lock:S.lock/1000,par:par,max:max,
          shots:[],lockUntil:0,sumSq:0,cnt:0,masked:false,osc:[],timers:[]};
     run.osc.push(beep(run.beepCtx,0.25,2600)); run.timers.push(flashAt(run.beepCtx));
     if(par>0){run.osc.push(beep(run.beepCtx+par,0.25,2600)); run.timers.push(flashAt(run.beepCtx+par))}
@@ -305,19 +456,24 @@ function stop(){
   if(was==="armed"){statusEl.textContent="Cancelled";return}
   renderShots();
   var rel=r.shots.map(function(t){return Math.round((t-r.t0)*1000)/1000});
-  if(rel.length){
-    var s=rel.length+(rel.length===1?" shot":" shots")+", first "+fmt(rel[0])+", total "+fmt(rel[rel.length-1]);
-    statusEl.textContent=s;
-    var notes=[];
-    if(!r.locked)notes.push("The mic didn't hear the start beep, so times may be slightly off. Turn the volume up.");
-    if(r.masked)notes.push("A sound during the par beep was ignored because the beep is louder than your trigger level.");
+  if(!rel.length){statusEl.textContent=micless?"Done":"No shots heard";return}
+  var raw=rel[rel.length-1];
+  statusEl.textContent=rel.length+(rel.length===1?" shot":" shots")+", first "+fmt(rel[0])+", total "+fmt(raw);
+  var notes=[];
+  if(!r.locked)notes.push("The mic didn't hear the start beep, so times may be slightly off. Turn the volume up.");
+  if(r.masked)notes.push("A sound during the par beep was ignored because the beep is louder than your trigger level.");
+  msg(notes.join(" "));
+  var entry={at:new Date().toISOString(),drill:r.drill.id,shots:rel,par:r.par,synced:r.locked,raw:raw,final:raw,hits:[],pen:0,clean:true};
+  if(r.drill.id==="free"){saveEntry(entry)}
+  else{
+    if(rel.length<r.drill.shots)notes.push("Heard "+rel.length+" of "+r.drill.shots+" shots.");
     msg(notes.join(" "));
-    hist.unshift({at:new Date().toISOString(),shots:rel,par:r.par,synced:r.locked});
-    if(hist.length>300)hist.length=300;
-    store.set("st.history",hist); renderHist();
-  }else{
-    statusEl.textContent=micless?"Done":"No shots heard";
+    showScore(entry,r.drill);
   }
+}
+function saveEntry(e){
+  hist.unshift(e); if(hist.length>500)hist.length=500;
+  store.set("st.history",hist); renderHist();
 }
 go.addEventListener("click",function(){(state==="armed"||state==="running")?stop():start()});
 $("test").addEventListener("click",function(){
@@ -326,6 +482,47 @@ $("test").addEventListener("click",function(){
 document.addEventListener("visibilitychange",function(){
   if(document.hidden){stop(); micOff()}
 });
+
+/* ---------- score card ---------- */
+function showScore(entry,d){
+  pending={entry:entry,drill:d};
+  $("sctitle").textContent="Score: "+d.name;
+  $("scraw").textContent="Raw time "+fmt(entry.raw)+" s. Enter your hits.";
+  var z=$("zones"); z.textContent="";
+  d.zones.forEach(function(zn,i){
+    var row=document.createElement("div"); row.className="zone";
+    var lab=document.createElement("label"); lab.textContent=zn.n+" (of "+zn.shots+")"; lab.htmlFor="z"+i;
+    var inp=document.createElement("input"); inp.type="number"; inp.id="z"+i; inp.inputMode="numeric";
+    inp.min=0; inp.max=zn.shots; inp.step=1; inp.value=zn.shots;
+    inp.addEventListener("input",calcScore);
+    row.appendChild(lab); row.appendChild(inp); z.appendChild(row);
+  });
+  calcScore(); $("score").hidden=false;
+  $("score").scrollIntoView({block:"nearest"});
+}
+function calcScore(){
+  if(!pending)return null;
+  var e=pending.entry,d=pending.drill,pen=0,hits=[],clean=true;
+  d.zones.forEach(function(zn,i){
+    var h=Math.max(0,Math.min(zn.shots,Math.round(Number($("z"+i).value)||0)));
+    hits.push(h); var miss=zn.shots-h; if(miss>0)clean=false; pen+=miss*zn.pen;
+  });
+  var fin=Math.round((e.raw+pen)*1000)/1000;
+  $("scfinal").textContent=fmt(fin);
+  var g="";
+  if(d.grades){for(var i=0;i<d.grades.length;i++){if(fin<d.grades[i][0]){g=d.grades[i][1];break}}}
+  else g=clean?"Clean":"Not clean";
+  if(pen>0)g+=", +"+fmt(pen)+" s in misses";
+  $("scgrade").textContent=g;
+  return {hits:hits,pen:pen,fin:fin,clean:clean};
+}
+function hideScore(){pending=null;$("score").hidden=true}
+$("scsave").addEventListener("click",function(){
+  var s=calcScore(); if(!s)return;
+  var e=pending.entry, nm=pending.drill.name; e.hits=s.hits; e.pen=s.pen; e.final=s.fin; e.clean=s.clean;
+  saveEntry(e); hideScore(); statusEl.textContent="Saved "+fmt(e.final)+" for "+nm;
+});
+$("scdrop").addEventListener("click",function(){hideScore();statusEl.textContent="Not saved"});
 
 /* ---------- drawing ---------- */
 function renderShots(){
@@ -352,7 +549,7 @@ function frame(){
       var now=micless?ctx.currentTime:samples/sr, el=Math.max(0,now-r.t0), n=r.shots.length;
       if(n){
         big.textContent=fmt(r.shots[n-1]-r.t0);
-        if(n!==drawn){renderShots(); statusEl.textContent="Shot "+n+(n>1?", split "+fmt(r.shots[n-1]-r.shots[n-2]):"")}
+        if(n!==drawn){renderShots(); statusEl.textContent="Shot "+n+(r.max?" of "+r.max:"")+(n>1?", split "+fmt(r.shots[n-1]-r.shots[n-2]):"")}
       }else{
         big.textContent=fmt(el); statusEl.textContent=micless?"Running":"Waiting for first shot";
       }
@@ -363,28 +560,55 @@ function frame(){
 }
 
 /* ---------- history ---------- */
+function dstamp(iso){
+  var d=new Date(iso);
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+}
 function renderHist(){
   var box=$("hist"); box.textContent="";
   $("hcount").textContent=hist.length?"("+hist.length+")":"";
-  if(!hist.length){var p=document.createElement("p");p.className="small";p.textContent="Nothing saved yet. Every string with at least one shot lands here.";box.appendChild(p);return}
-  hist.forEach(function(h,i){
-    var row=document.createElement("div");row.className="hrow";
-    var d=new Date(h.at), txt=document.createElement("span");
-    txt.textContent=d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+
-      d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})+"  "+
-      h.shots.length+" shots, first "+fmt(h.shots[0])+", total "+fmt(h.shots[h.shots.length-1])+
-      (h.par?", par "+fmt(h.par):"");
-    var x=document.createElement("button");x.className="btn x";x.type="button";x.textContent="Delete";
-    x.setAttribute("aria-label","Delete this string");
-    x.addEventListener("click",function(){hist.splice(i,1);store.set("st.history",hist);renderHist()});
-    row.appendChild(txt);row.appendChild(x);box.appendChild(row);
+  if(!hist.length){var p=document.createElement("p");p.className="small";p.textContent="Nothing saved yet. Scored drill runs and free-run strings land here.";box.appendChild(p);return}
+  var groups={},order=[];
+  hist.forEach(function(h){var id=h.drill||"free";if(!groups[id]){groups[id]=[];order.push(id)}groups[id].push(h)});
+  order.sort(function(a,b){return a==="free"?1:b==="free"?-1:drillName(a).localeCompare(drillName(b))});
+  order.forEach(function(id){
+    var rows=groups[id], g=document.createElement("div"); g.className="dgroup";
+    var h3=document.createElement("h3"), nm=document.createElement("span"); nm.textContent=drillName(id);
+    var st=document.createElement("span"); st.className="stats";
+    var finals=rows.map(function(h){return h.final!=null?h.final:h.shots[h.shots.length-1]});
+    var best=Math.min.apply(null,finals), last=finals.slice(0,5), avg=last.reduce(function(a,b){return a+b},0)/last.length;
+    st.textContent=rows.length+(rows.length===1?" run":" runs")+", best "+fmt(best)+", last "+last.length+" avg "+fmt(avg);
+    h3.appendChild(nm); h3.appendChild(st); g.appendChild(h3);
+    rows.forEach(function(h){
+      var row=document.createElement("div"); row.className="hrow";
+      var fin=h.final!=null?h.final:h.shots[h.shots.length-1];
+      var txt=document.createElement("span");
+      var parts=[dstamp(h.at)];
+      if(id==="free")parts.push(h.shots.length+" shots, first "+fmt(h.shots[0])+", total "+fmt(fin)+(h.par?", par "+fmt(h.par):""));
+      else{
+        var s=fmt(fin);
+        if(h.pen>0)s+=" (raw "+fmt(h.raw)+")";
+        s+=", "+(h.hits&&h.hits.length?h.hits.join("+")+" hits":h.shots.length+" shots");
+        if(h.clean===false)s+=", not clean";
+        parts.push(s);
+      }
+      txt.textContent=parts.join(": ");
+      if(fin===best&&rows.length>1)txt.className="best";
+      var x=document.createElement("button");x.className="btn x";x.type="button";x.textContent="Delete";
+      x.setAttribute("aria-label","Delete this run");
+      x.addEventListener("click",function(){var i=hist.indexOf(h);if(i>=0){hist.splice(i,1);store.set("st.history",hist);renderHist()}});
+      row.appendChild(txt);row.appendChild(x);g.appendChild(row);
+    });
+    box.appendChild(g);
   });
 }
 $("csv").addEventListener("click",function(){
-  var lines=["string,date,par,shot,time,split"];
+  var lines=["run,date,drill,raw,penalty,final,clean,hits,shot,time,split"];
   hist.slice().reverse().forEach(function(h,si){
+    var fin=h.final!=null?h.final:h.shots[h.shots.length-1], raw=h.raw!=null?h.raw:fin;
     h.shots.forEach(function(t,i){
-      lines.push([si+1,h.at,h.par||0,i+1,t.toFixed(3),(i?t-h.shots[i-1]:t).toFixed(3)].join(","));
+      lines.push([si+1,h.at,'"'+drillName(h.drill||"free").replace(/"/g,'""')+'"',raw.toFixed(3),(h.pen||0).toFixed(2),fin.toFixed(3),
+                  h.clean===false?"no":"yes",(h.hits||[]).join("+"),i+1,t.toFixed(3),(i?t-h.shots[i-1]:t).toFixed(3)].join(","));
     });
   });
   var text=lines.join("\n"),out=$("csvout");
@@ -394,7 +618,42 @@ $("csv").addEventListener("click",function(){
   }else show();
 });
 $("wipe").addEventListener("click",function(){
-  if(hist.length&&confirm("Delete all saved strings?")){hist=[];store.set("st.history",hist);renderHist()}
+  if(hist.length&&confirm("Delete all saved runs? Custom drills are kept."))
+    {hist=[];store.set("st.history",hist);renderHist()}
+});
+
+/* ---------- backup / restore ---------- */
+$("backup").addEventListener("click",function(){
+  var data={app:"shot-timer",version:1,exported:new Date().toISOString(),history:hist,drills:custom,settings:S};
+  var text=JSON.stringify(data,null,1);
+  var name="shot-timer-backup-"+data.exported.slice(0,10)+".json";
+  try{
+    var blob=new Blob([text],{type:"application/json"}), url=URL.createObjectURL(blob);
+    var a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url)},2000);
+    statusEl.textContent="Backup file created";
+  }catch(e){
+    var out=$("csvout"); out.hidden=false; out.value=text; out.focus(); out.select();
+    msg("Couldn't create a file here. The backup text is below; copy it and save it as "+name+".");
+  }
+});
+$("restore").addEventListener("change",function(){
+  var f=this.files&&this.files[0]; if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var data; try{data=JSON.parse(rd.result)}catch(e){msg("That file isn't a shot timer backup.");return}
+    if(!data||data.app!=="shot-timer"||!Array.isArray(data.history)){msg("That file isn't a shot timer backup.");return}
+    var have={},added=0,addedD=0;
+    hist.forEach(function(h){have[h.at]=1});
+    data.history.forEach(function(h){if(h&&h.at&&!have[h.at]&&Array.isArray(h.shots)){hist.push(h);have[h.at]=1;added++}});
+    hist.sort(function(a,b){return a.at<b.at?1:-1});
+    var haveD={}; custom.forEach(function(d){haveD[d.id]=1});
+    (data.drills||[]).forEach(function(d){if(d&&d.id&&!haveD[d.id]&&d.name){custom.push(d);addedD++}});
+    store.set("st.history",hist); store.set("st.drills",custom);
+    paintDrills(); renderHist();
+    statusEl.textContent="Restored "+added+" runs and "+addedD+" drills"; msg("");
+  };
+  rd.readAsText(f); this.value="";
 });
 
 /* ---------- settings ---------- */
@@ -409,7 +668,7 @@ function paintSettings(){
     store.set("st.settings",S); paintSettings();
   });
 });
-paintSettings(); renderHist(); requestAnimationFrame(frame);
+paintSettings(); paintDrills(); renderHist(); requestAnimationFrame(frame);
 })();
 </script>
 </body>
