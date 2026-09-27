@@ -134,6 +134,16 @@ input[type=file]{font:inherit; max-width:100%}
     <button id="edit" class="btn" type="button">Edit</button>
   </div>
   <p id="ddesc"></p>
+  <div class="drillrow">
+    <select id="gtype" aria-label="Gun type" style="flex:0 0 auto">
+      <option value="Pistol">Pistol</option>
+      <option value="Rifle">Rifle</option>
+      <option value="Lever action">Lever action</option>
+      <option value="Shotgun">Shotgun</option>
+    </select>
+    <input id="gun" type="text" list="gunlist" maxlength="40" placeholder="Which gun (optional)" autocomplete="off" aria-label="Which gun" style="flex:1;min-width:0">
+    <datalist id="gunlist"></datalist>
+  </div>
   <div class="drillrow" id="whorow" hidden>
     <label for="who" class="small" style="white-space:nowrap">Who's shooting</label>
     <select id="who" aria-label="Who's shooting"></select>
@@ -251,13 +261,34 @@ var store={
   get:function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 };
-var S={delay:"random",par:0,max:0,level:50,lock:80,drill:"free",guests:false,who:""};
+var S={delay:"random",par:0,max:0,level:50,lock:80,drill:"free",guests:false,who:"",gtype:"Pistol",gun:""};
 var saved=store.get("st.settings",null);
 if(saved&&typeof saved==="object"){for(var k in S){if(saved[k]!==undefined)S[k]=saved[k]}}
 var hist=store.get("st.history",[]); if(!Array.isArray(hist))hist=[];
 var custom=store.get("st.drills",[]); if(!Array.isArray(custom))custom=[];
 var guests=store.get("st.guests",[]); if(!Array.isArray(guests))guests=[];
 var histWho="";  /* "" = me, name = that guest, "*" = everyone */
+var guns=store.get("st.guns",[]); if(!Array.isArray(guns))guns=[];
+
+/* ---------- guns ---------- */
+var GTYPES=["Pistol","Rifle","Lever action","Shotgun"];
+function paintGuns(){
+  var dl=$("gunlist"); dl.textContent="";
+  guns.forEach(function(g){var o=document.createElement("option");o.value=g;dl.appendChild(o)});
+  if(GTYPES.indexOf(S.gtype)<0)S.gtype="Pistol";
+  $("gtype").value=S.gtype; $("gun").value=S.gun||"";
+}
+function rememberGun(g){
+  if(!g)return;
+  var i=guns.indexOf(g); if(i>=0)guns.splice(i,1);
+  guns.unshift(g); if(guns.length>30)guns.length=30;
+  store.set("st.guns",guns); paintGuns();
+}
+function gunLabel(h){
+  var t=h.gtype||"Pistol"; return h.gun?t+", "+h.gun:t;
+}
+$("gtype").addEventListener("change",function(){S.gtype=this.value;store.set("st.settings",S)});
+$("gun").addEventListener("change",function(){S.gun=this.value.trim().slice(0,40);this.value=S.gun;store.set("st.settings",S)});
 
 /* ---------- shooters ---------- */
 function shooterNow(){return S.guests?(S.who||""):""}
@@ -474,7 +505,8 @@ function start(){
     var par=d.id==="free"?(Number(S.par)||0):(Number(d.par)||0);
     var max=d.id==="free"?(Number(S.max)||0):d.shots;
     clockOff=Infinity;
-    run={drill:d,who:shooterNow(),beepCtx:ctx.currentTime+delay,expT:0,t0:0,locked:false,beepPeak:0,beepThresh:1,
+    S.gun=$("gun").value.trim().slice(0,40); S.gtype=$("gtype").value; store.set("st.settings",S);
+    run={drill:d,who:shooterNow(),gtype:S.gtype,gun:S.gun,beepCtx:ctx.currentTime+delay,expT:0,t0:0,locked:false,beepPeak:0,beepThresh:1,
          thr:S.level/100,lock:S.lock/1000,par:par,max:max,
          shots:[],lockUntil:0,sumSq:0,cnt:0,masked:false,osc:[],timers:[]};
     run.osc.push(beep(run.beepCtx,0.25,2600)); run.timers.push(flashAt(run.beepCtx));
@@ -504,7 +536,7 @@ function stop(){
   if(!r.locked)notes.push("The mic didn't hear the start beep, so times may be slightly off. Turn the volume up.");
   if(r.masked)notes.push("A sound during the par beep was ignored because the beep is louder than your trigger level.");
   msg(notes.join(" "));
-  var entry={at:new Date().toISOString(),drill:r.drill.id,who:r.who,shots:rel,par:r.par,synced:r.locked,raw:raw,final:raw,hits:[],pen:0,clean:true};
+  var entry={at:new Date().toISOString(),drill:r.drill.id,who:r.who,gtype:r.gtype,gun:r.gun,shots:rel,par:r.par,synced:r.locked,raw:raw,final:raw,hits:[],pen:0,clean:true};
   if(r.drill.id==="free"){saveEntry(entry)}
   else{
     if(rel.length<r.drill.shots)notes.push("Heard "+rel.length+" of "+r.drill.shots+" shots.");
@@ -513,6 +545,7 @@ function stop(){
   }
 }
 function saveEntry(e){
+  rememberGun(e.gun);
   hist.unshift(e); if(hist.length>500)hist.length=500;
   store.set("st.history",hist); renderHist();
 }
@@ -631,11 +664,16 @@ function renderHist(){
   var shown=hist.filter(function(h){return histWho==="*"||(h.who||"")===histWho});
   if(!shown.length){var p=document.createElement("p");p.className="small";p.textContent=hist.length?"No runs for "+whoLabel(histWho)+" yet.":"Nothing saved yet. Scored drill runs and free-run strings land here.";box.appendChild(p);return}
   var groups={},order=[];
-  shown.forEach(function(h){var id=h.drill||"free";if(!groups[id]){groups[id]=[];order.push(id)}groups[id].push(h)});
-  order.sort(function(a,b){return a==="free"?1:b==="free"?-1:drillName(a).localeCompare(drillName(b))});
-  order.forEach(function(id){
-    var rows=groups[id], g=document.createElement("div"); g.className="dgroup";
-    var h3=document.createElement("h3"), nm=document.createElement("span"); nm.textContent=drillName(id);
+  shown.forEach(function(h){var key=(h.drill||"free")+"|"+(h.gtype||"Pistol");if(!groups[key]){groups[key]=[];order.push(key)}groups[key].push(h)});
+  order.sort(function(a,b){
+    var da=a.split("|")[0],db=b.split("|")[0];
+    if(da!==db)return da==="free"?1:db==="free"?-1:drillName(da).localeCompare(drillName(db));
+    return GTYPES.indexOf(a.split("|")[1])-GTYPES.indexOf(b.split("|")[1]);
+  });
+  order.forEach(function(key){
+    var id=key.split("|")[0], gt=key.split("|")[1];
+    var rows=groups[key], g=document.createElement("div"); g.className="dgroup";
+    var h3=document.createElement("h3"), nm=document.createElement("span"); nm.textContent=drillName(id)+(gt!=="Pistol"?", "+gt.toLowerCase():"");
     var st=document.createElement("span"); st.className="stats";
     var finals=rows.map(function(h){return h.final!=null?h.final:h.shots[h.shots.length-1]});
     var best=Math.min.apply(null,finals), last=finals.slice(0,5), avg=last.reduce(function(a,b){return a+b},0)/last.length;
@@ -654,7 +692,7 @@ function renderHist(){
         if(h.clean===false)s+=", not clean";
         parts.push(s);
       }
-      txt.textContent=parts.join(": ");
+      txt.textContent=parts.join(": ")+(h.gun?" ("+h.gun+")":"");
       if(fin===best&&rows.length>1)txt.className="best";
       var x=document.createElement("button");x.className="btn x";x.type="button";x.textContent="Delete";
       x.setAttribute("aria-label","Delete this run");
@@ -665,11 +703,12 @@ function renderHist(){
   });
 }
 $("csv").addEventListener("click",function(){
-  var lines=["run,date,shooter,drill,raw,penalty,final,clean,hits,shot,time,split"];
+  var q=function(s){return '"'+String(s||"").replace(/"/g,'""')+'"'};
+  var lines=["run,date,shooter,drill,gun_type,gun,raw,penalty,final,clean,hits,shot,time,split"];
   hist.slice().reverse().forEach(function(h,si){
     var fin=h.final!=null?h.final:h.shots[h.shots.length-1], raw=h.raw!=null?h.raw:fin;
     h.shots.forEach(function(t,i){
-      lines.push([si+1,h.at,'"'+whoLabel(h.who).replace(/"/g,'""')+'"','"'+drillName(h.drill||"free").replace(/"/g,'""')+'"',raw.toFixed(3),(h.pen||0).toFixed(2),fin.toFixed(3),
+      lines.push([si+1,h.at,q(whoLabel(h.who)),q(drillName(h.drill||"free")),q(h.gtype||"Pistol"),q(h.gun),raw.toFixed(3),(h.pen||0).toFixed(2),fin.toFixed(3),
                   h.clean===false?"no":"yes",(h.hits||[]).join("+"),i+1,t.toFixed(3),(i?t-h.shots[i-1]:t).toFixed(3)].join(","));
     });
   });
@@ -686,7 +725,7 @@ $("wipe").addEventListener("click",function(){
 
 /* ---------- backup / restore ---------- */
 $("backup").addEventListener("click",function(){
-  var data={app:"shot-timer",version:2,exported:new Date().toISOString(),history:hist,drills:custom,guests:guests,settings:S};
+  var data={app:"shot-timer",version:3,exported:new Date().toISOString(),history:hist,drills:custom,guests:guests,guns:guns,settings:S};
   var text=JSON.stringify(data,null,1);
   var name="shot-timer-backup-"+data.exported.slice(0,10)+".json";
   try{
@@ -713,8 +752,10 @@ $("restore").addEventListener("change",function(){
     (data.drills||[]).forEach(function(d){if(d&&d.id&&!haveD[d.id]&&d.name){custom.push(d);addedD++}});
     (data.guests||[]).forEach(function(n){if(typeof n==="string"&&n&&guests.indexOf(n)<0)guests.push(n)});
     hist.forEach(function(h){if(h.who&&guests.indexOf(h.who)<0)guests.push(h.who)});
-    store.set("st.history",hist); store.set("st.drills",custom); store.set("st.guests",guests);
-    paintDrills(); paintWho(); renderHist();
+    (data.guns||[]).forEach(function(g){if(typeof g==="string"&&g&&guns.indexOf(g)<0)guns.push(g)});
+    hist.forEach(function(h){if(h.gun&&guns.indexOf(h.gun)<0)guns.push(h.gun)});
+    store.set("st.history",hist); store.set("st.drills",custom); store.set("st.guests",guests); store.set("st.guns",guns);
+    paintDrills(); paintWho(); paintGuns(); renderHist();
     statusEl.textContent="Restored "+added+" runs and "+addedD+" drills"; msg("");
   };
   rd.readAsText(f); this.value="";
@@ -733,7 +774,7 @@ function paintSettings(){
   });
 });
 $("guests").checked=!!S.guests;
-paintSettings(); paintDrills(); paintWho(); renderHist(); requestAnimationFrame(frame);
+paintSettings(); paintDrills(); paintWho(); paintGuns(); renderHist(); requestAnimationFrame(frame);
 })();
 </script>
 </body>
